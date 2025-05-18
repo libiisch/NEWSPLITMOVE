@@ -8,16 +8,16 @@
 #define limbX 3 // "limb" stands for "limit button", therfore limit button X.
 #define limbY 5 // limit button Y.
 
-int spin = 400; // One full step for HALF stepper motor steps
+int spin = 40; // One full step for HALF stepper motor steps
 const int VRX_PIN = A0;
 const int VRY_PIN = A1;
 const int SW_PIN = 7;
-int Xcoords =0;
-bool globalBTNPress = false; 
+int Xcoords = 0;
+//bool globalBTNPress = false; 
 
-int MOVEMENT_BACKWARDS = -1; // When axis is -1, the motor moves in the opposite direction (backwards).
+//int MOVEMENT_BACKWARDS = -1; // When axis is -1, the motor moves in the opposite direction (backwards).
 int NO_MOVEMENT = 0;         // When axis is 0, the motor doesn't receive a step pulse, so it doesn't move.
-int MOVEMENT_FORWARDS = 1;   // In the doMove() function, when the axis value is 1 the motor moves in forward.
+//int MOVEMENT_FORWARDS = 1;   // In the doMove() function, when the axis value is 1 the motor moves in forward.
 
 unsigned long lastClickedX = millis(); // Store the current time in milliseconds
 unsigned long lastClickedY = millis(); // Store the current time for Y as well
@@ -37,28 +37,21 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(limbX), btnClickedX, FALLING); // Whenever limbX is in falling state, activate ISR btnClickedX.
   attachInterrupt(digitalPinToInterrupt(limbY), btnClickedY, FALLING); // Whenever limbY is in falling state, activate ISR btnClickedY.
 
-  //home(); // Resets x,y's positions to their set home every upload.
+  home(); // Resets x,y's positions to their set home every upload.
 }
 
 void loop() {
-  int x = analogRead(VRX_PIN); // Inserts VRX_PIN's analog value (0/1) into integer X.
-  int y = analogRead(VRY_PIN); // Inserts VRY_PIN's analog value (0/1) into integer Y.
+  checkMovementX();
+  checkMovementY();
 
-  if(!globalBTNpress) { // Inital gb"p state is false, therefore; if neither of the limbs are pressed, move "normally".
-
-    int xMovement = checkMovement(x); // Move based on joystick movement on X axis (VRX_PIN)
-    int yMovement = checkMovement(y); // Move based on joystick movement on y axis (VRY_PIN)
-
-    doMove(true, xMovement);  // "isX" is true (meaning it = X), so move on X axis.
-    doMove(false, yMovement); // "isX" is false (meaning it = Y), so move on Y axis.
-  }
 }
+
 
 void btnClickedX() { // Not only - but also a debouncer.
   unsigned long currentTime = millis(); // New value in millis to represent the current time in millis since upload.
 
   if (currentTime - lastClickedX > 100) { // If the last click happened more than 100 millis ago, accept new one.
-    XREVERSEMOVE(100, 300, LOW); // *******this is the X reverse function to call a reverse movement when limbX is pressed. this switch the globalBTNPress method.********
+    XREVERSE(); // *******this is the X reverse function to call a reverse movement when limbX is pressed. this switch the globalBTNPress method.********
     
     lastClickedX = currentTime; // Sets the last click's timestamp to the latest timestamp a click has occured on.
   }
@@ -68,53 +61,73 @@ void btnClickedY () {
   unsigned long currentTime = millis();
 
   if(currentTime - lastClickedY > 100) {
-    YREVERSEMOVE(100, 300, LOW); // *******this is the Y reverse function to call a reverse movement when limbY is pressed. this switch the globalBTNPress method.********
+    YREVERSE(); // *******this is the Y reverse function to call a reverse movement when limbY is pressed. this switch the globalBTNPress method.********
 
     lastClickedY = currentTime; // Sets the last click's timestamp to the latest timestamp a click has occured on.
   }
 }
 
-void doMove(int isX, int axis) {
+int checkMovementX() {
+  int x = analogRead(VRX_PIN);
 
-  if (axis == MOVEMENT_FORWARDS) {
-    MOVE(isX, spin, 300, HIGH);
-  } else if (axis == MOVEMENT_BACKWARDS) {
-    MOVE(isX, spin, 300, LOW);
-  }
-}
-
-int checkMovement(int joy) {
-  if (joy > 600) {
-    return MOVEMENT_FORWARDS;
-  } else if (joy < 400) {
-    return MOVEMENT_BACKARDS;
+  if (x > 600) {
+    MOVEX(spin, 300, HIGH);
+  } else if (x < 400) {
+    MOVEX(spin, 300, LOW);
   } else {
     return NO_MOVEMENT;
   }
 }
 
-void engineCycle(int ste. int spe) {
-  digitalWrite(ste, HIGH);
-  delayMicroseconds(spe);
-  digitalWrite(ste, LOW);
-  delayMicroseconds(spe);
-}
+int checkMovementY() {
+  int y = analogRead(VRY_PIN);
 
-void MOVE(bool isX, int steps, int speed, bool direction) {
-
-  int dirPin = isX ? DIRX_PIN : DIRY_PIN;
-  int stepPin = isX ? STEPX_PIN : STEPY_PIN;
-  int limb = isX ? limbX : limbY;
-
-  Serial.println("Moving direction:" + String(direction) + "dirPin:" + string(dirPin));
-
-  digitalWrite(dirPin, direction);
-  for (int i = 0; i < steps; i++) {
-    engineCycle(stepPin, speed);
-
-    // this is when I need to split into two reverses. Clearly, the "globalBTNPress" method did not work; where it would represent a click on each button,
-    // and move in the reverse based on which button is was and the !direction. DIDN'T WORK.
-    // so, instead, i'll go back to the basics - split the MOVE function into two - one for X, and one for Y. Then i'll use reverse functions that'll be called after a button press on either limbY or limbX.
-    // this is something i've tried before and it didn't really work either. Hopefully it will work this time.
+  if (y > 600) {
+    MOVEY(spin, 300, HIGH);
+  } else if (y < 400) {
+    MOVEY(spin, 300, LOW);
+  } else {
+    return NO_MOVEMENT;
   }
 }
+
+
+void MOVEX(int steps, int speed, bool direction) {
+  digitalWrite(DIRX_PIN, direction);
+  digitalWrite(STEPX_PIN, steps);
+
+  for (int i = 0; i < steps; i++) {
+    digitalWrite(steps, HIGH);
+    delayMicroseconds(speed);
+    digitalWrite(steps, LOW);
+    delayMicroseconds(speed);
+  }
+}
+
+void XREVERSE() {
+  MOVEX(100, 300, LOW);
+}
+
+
+void MOVEY(int steps, int speed, bool direction) {
+  digitalWrite(DIRY_PIN, direction);
+  digitalWrite(STEPY_PIN, steps);
+
+  for (int i = 0; i < steps; i++) {
+    digitalWrite(steps, HIGH);
+    delayMicroseconds(speed);
+    digitalWrite(steps, LOW);
+    delayMicroseconds(speed);
+  }
+}
+
+void YREVERSE() {
+  MOVEY(100, 300, LOW);
+}
+
+void home() {
+  Serial.println("starting home");
+  MOVEX(8000, 300, HIGH);   // true = x
+  MOVEY(8000, 300, HIGH);  // false = y
+}
+
