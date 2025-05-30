@@ -1,4 +1,5 @@
 #include <Wire.h>
+#include <LiquidCrystal_I2C.h>
 
 #define STEPX_PIN 4
 #define DIRX_PIN 10
@@ -6,9 +7,9 @@
 #define DIRY_PIN 8
 
 #define limbX 3 // "limb" stands for "limit button", therfore limit button X.
-#define limbY 5 // limit button Y.
+#define limbY 2 // limit button Y.
 
-int spin = 40; // One full step for HALF stepper motor steps
+int spin = 400; // One full step for HALF stepper motor steps
 const int VRX_PIN = A0;
 const int VRY_PIN = A1;
 const int SW_PIN = 7;
@@ -22,6 +23,8 @@ int NO_MOVEMENT = 0;         // When axis is 0, the motor doesn't receive a step
 unsigned long lastClickedX = millis(); // Store the current time in milliseconds
 unsigned long lastClickedY = millis(); // Store the current time for Y as well
 
+LiquidCrystal_I2C lcd(0x27, 16, 2);  // lcd library
+
 void setup() {
   pinMode(STEPX_PIN, OUTPUT);
   pinMode(DIRX_PIN, OUTPUT);
@@ -31,19 +34,27 @@ void setup() {
   pinMode(limbX, INPUT_PULLUP); // Neutral state = 1 for limit button X
   pinMode(limbY, INPUT_PULLUP); // Neutral state = 1 for limit button Y
 
+  lcd.init();
+  lcd.backlight();
+
   Serial.begin(9600);
   Serial.println("setup finished, wait for home.");
 
-  attachInterrupt(digitalPinToInterrupt(limbX), btnClickedX, FALLING); // Whenever limbX is in falling state, activate ISR btnClickedX.
-  attachInterrupt(digitalPinToInterrupt(limbY), btnClickedY, FALLING); // Whenever limbY is in falling state, activate ISR btnClickedY.
+  attachInterrupt(digitalPinToInterrupt(limbX), btnClickedX, CHANGE); // Whenever limbX is in falling state, activate ISR btnClickedX.
+  attachInterrupt(digitalPinToInterrupt(limbY), btnClickedY, CHANGE); // Whenever limbY is in falling state, activate ISR btnClickedY.
 
   home(); // Resets x,y's positions to their set home every upload.
+  //MOVEX(400, 300, 1);
+  //MOVEX(500, 300, 0);
+  //Serial.println("done setup");
+
 }
 
 void loop() {
+
   checkMovementX();
   checkMovementY();
-
+  //coordinations();
 }
 
 
@@ -52,26 +63,31 @@ void btnClickedX() { // Not only - but also a debouncer.
 
   if (currentTime - lastClickedX > 100) { // If the last click happened more than 100 millis ago, accept new one.
     XREVERSE(); // *******this is the X reverse function to call a reverse movement when limbX is pressed. this switch the globalBTNPress method.********
-    
+    //xreverse(10, 400, 1);
+    Serial.println("limbx reached!");
     lastClickedX = currentTime; // Sets the last click's timestamp to the latest timestamp a click has occured on.
   }
 }
 
-void btnClickedY () {
-  unsigned long currentTime = millis();
+void btnClickedY() { // Not only - but also a debouncer.
+  unsigned long currentTime = millis(); // New value in millis to represent the current time in millis since upload.
 
-  if(currentTime - lastClickedY > 100) {
-    YREVERSE(); // *******this is the Y reverse function to call a reverse movement when limbY is pressed. this switch the globalBTNPress method.********
-
-    lastClickedY = currentTime; // Sets the last click's timestamp to the latest timestamp a click has occured on.
+  if (currentTime - lastClickedY > 100) { // If the last click happened more than 100 millis ago, accept new one.
+    YREVERSE(); // *******this is the X reverse function to call a reverse movement when limbX is pressed. this switch the globalBTNPress method.********
+    //break;
+    Serial.println("limby reached!");
+    lastClickedX = currentTime; // Sets the last click's timestamp to the latest timestamp a click has occured on.
   }
 }
 
+
 int checkMovementX() {
   int x = analogRead(VRX_PIN);
+  //Serial.println("moving on x");
 
   if (x > 600) {
     MOVEX(spin, 300, HIGH);
+
   } else if (x < 400) {
     MOVEX(spin, 300, LOW);
   } else {
@@ -81,6 +97,7 @@ int checkMovementX() {
 
 int checkMovementY() {
   int y = analogRead(VRY_PIN);
+  //Serial.println("moving on y");
 
   if (y > 600) {
     MOVEY(spin, 300, HIGH);
@@ -94,40 +111,69 @@ int checkMovementY() {
 
 void MOVEX(int steps, int speed, bool direction) {
   digitalWrite(DIRX_PIN, direction);
-  digitalWrite(STEPX_PIN, steps);
 
   for (int i = 0; i < steps; i++) {
-    digitalWrite(steps, HIGH);
+    digitalWrite(STEPX_PIN, HIGH);
+    //Serial.println(i);
     delayMicroseconds(speed);
-    digitalWrite(steps, LOW);
+    digitalWrite(STEPX_PIN, LOW);
     delayMicroseconds(speed);
   }
 }
 
 void XREVERSE() {
-  MOVEX(100, 300, LOW);
+  MOVEX(4510, 300, 0); //4510 steps for full X
 }
 
 
 void MOVEY(int steps, int speed, bool direction) {
   digitalWrite(DIRY_PIN, direction);
-  digitalWrite(STEPY_PIN, steps);
 
   for (int i = 0; i < steps; i++) {
-    digitalWrite(steps, HIGH);
+    digitalWrite(STEPY_PIN, HIGH);
     delayMicroseconds(speed);
-    digitalWrite(steps, LOW);
+    digitalWrite(STEPY_PIN, LOW);
     delayMicroseconds(speed);
   }
 }
 
 void YREVERSE() {
-  MOVEY(100, 300, LOW);
+  MOVEY(2130, 400, 0);//2120 steps for full y 
 }
+
 
 void home() {
-  Serial.println("starting home");
-  MOVEX(8000, 300, HIGH);   // true = x
-  MOVEY(8000, 300, HIGH);  // false = y
+  //Serial.println("starting home");
+  lcd.setCursor(1, 0);
+  lcd.print("starting home");
+  MOVEX(3500, 300, HIGH);   // true = x
+  MOVEY(4000, 300, HIGH);   // false = y
+  lcd.clear();
+  //Serial.println("finished home");
+  lcd.setCursor(1, 0);
+  lcd.print("finished home");
 }
 
+void coordinations() {  // print on LCD x,y coordinations.
+
+  lcd.setCursor(4, 0);
+  lcd.print("X  |  Y");
+  lcd.setCursor(7, 1);
+  lcd.print("|");
+
+  lcd.setCursor(3, 1);
+  lcd.print(analogRead(VRX_PIN));
+  //Serial.println(analogRead(VRX_PIN));
+  if (analogRead(VRX_PIN) < 1000) {  // fixed numbers bug
+    lcd.setCursor(6, 1);
+    lcd.print(" ");
+  }
+
+
+  lcd.setCursor(9, 1);
+  lcd.print(analogRead(VRY_PIN));
+  if (analogRead(VRY_PIN) < 1000) {  // fixed numbers bug
+    lcd.setCursor(12, 1);
+    lcd.print(" ");
+  }
+}
